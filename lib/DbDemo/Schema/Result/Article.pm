@@ -21,9 +21,10 @@ column content => {
     data_type => 'varchar',
 };
 
-has_many article_keywords => 'DbDemo::Schema::Result::ArticleKeyword', 'article_id';
-
-many_to_many keywords => 'article_keywords', 'keyword';
+belongs_to   author           => 'DbDemo::Schema::Result::Author',         'author_id';
+has_many     images           => 'DbDemo::Schema::Result::Image',          'article_id';
+has_many     article_keywords => 'DbDemo::Schema::Result::ArticleKeyword', 'article_id';
+many_to_many keywords         => 'article_keywords',                       'keyword';
 
 1;
 

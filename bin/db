@@ -1,0 +1,79 @@
+#!/usr/bin/env perl
+use Modern::Perl;
+use FindBin;
+use lib "$FindBin::Bin/../lib";
+use DbDemo::Schema;
+
+die 'add a sub name to call (delete, populate, query)'
+    if !@ARGV;
+
+# Anzeige der SQL Anweisungen
+$ENV{DBIC_TRACE} = 1;
+$ENV{DBIC_TRACE_PROFILE} = 'console';
+
+my $schema = DbDemo::Schema->connect("dbi:SQLite:$FindBin::Bin/../article.db");
+
+no strict 'refs';
+$ARGV[0]();
+exit;
+
+sub populate {
+    $schema->populate(
+        Article => [
+            {
+                headline => 'Foo #1',
+                content  => 'Erster $foo Artikel',
+                author   => {
+                    name => 'Viel Schreiber',
+                },
+                images => [
+                    { path => '/path/to/img1.png' },
+                    { path => '/path/to/img2.png' },
+                ],
+                article_keywords => [
+                    { keyword => { name => 'DBIC' } },
+                    { keyword => { name => 'Perl' } },
+                ],
+            },
+            {
+                headline => 'Foo #2',
+                content  => 'weiterer $foo Artikel',
+                author   => {
+                    name => 'Viel Schreiber',
+                },
+                images => [
+                    { path    => '/path/to/img3.png' },
+                ],
+                article_keywords => [
+                    { keyword => { name => 'Perl' } },
+                ],
+            },
+            {
+                headline => 'Foo #3',
+                content  => 'und noch ein $foo Artikel',
+                author   => {
+                    name => 'Wenig Schreiber',
+                },
+                article_keywords => [
+                    { keyword => { name => 'Perl' } },
+                    { keyword => { name => 'Moose' } },
+                ],
+            },
+        ],
+    );
+}
+
+sub delete {
+    foreach my $resultset (qw(Image ArticleKeyword Keyword Article Author)) {
+        $schema->resultset($resultset)->delete;
+    }
+}
+
+sub query {
+    my $article_rs = $schema->resultset('Article');
+    while (my $article = $article_rs->next) {
+        say 'Article ID ', $article->id,
+            ' "',          $article->headline, '"',
+            ' by ',        $article->author->name;
+    }
+}

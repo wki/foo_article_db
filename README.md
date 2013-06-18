@@ -10,7 +10,11 @@ Datenbank einrichten
     $ dzil listdeps | cpanm
     $ rm -rf share
     $ mkdir share
-    $ dbic-migration -Ilib --schema_class DbDemo::Schema --dsn dbi:SQLite:author.db --dir share prepare
-    $ dbic-migration -Ilib --schema_class DbDemo::Schema --dsn dbi:SQLite:author.db --dir share install
+    
+    # SQLite:
+    $ dbic-migration -Ilib --schema_class DbDemo::Schema --dsn dbi:SQLite:article.db --dir share prepare
+    $ dbic-migration -Ilib --schema_class DbDemo::Schema --dsn dbi:SQLite:article.db --dir share install
 
-
+    # Postgres (Benutzer: "postgres", Passwort leer, Datenbank "article")
+    $ dbic-migration -Ilib --schema_class DbDemo::Schema --dir share --dsn dbi:Pg:dbname=article -U postgres prepare
+    $ dbic-migration -Ilib --schema_class DbDemo::Schema --dir share --dsn dbi:Pg:dbname=article -U postgres install

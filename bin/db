@@ -4,8 +4,7 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use DbDemo::Schema;
 
-die 'add a sub name to call (delete, populate, query)'
-    if !@ARGV;
+print_usage() if !@ARGV;
 
 # Anzeige der SQL Anweisungen
 $ENV{DBIC_TRACE} = 1;
@@ -16,6 +15,23 @@ my $schema = DbDemo::Schema->connect("dbi:SQLite:$FindBin::Bin/../article.db");
 no strict 'refs';
 $ARGV[0]();
 exit;
+
+sub print_usage {
+    say <<EOF;
+Bitte einen der folgenden Befehle anhaengen:
+
+    populate    zum befuellen der Datenbank
+    delete      zum leeren der Datenbank
+    find        holt einen Datensatz und greift implizit auf Beziehung zu
+    query       Schleife über alle Sätze und impliziter Beziehungs-Zugriff
+    prefetch    holt einen Datensatz inklusive Beziehung
+    full        holt einen Datensatz inklusive aller Beziehungen
+    sub_in      subquery bei in
+    sub_exists  subquery mit exists
+    sub_column  subquery mit extra Spalte
+EOF
+    exit;
+}
 
 sub populate {
     $schema->populate(
@@ -69,11 +85,123 @@ sub delete {
     }
 }
 
+sub find {
+    my $article = $schema->resultset('Article')->find(1);
+    print_article_short($article);
+}
+
+sub prefetch {
+    my $article = $schema->resultset('Article')->search(undef, {prefetch => 'author'})->find(1);
+
+    print_article_short($article);
+}
+
 sub query {
     my $article_rs = $schema->resultset('Article');
     while (my $article = $article_rs->next) {
-        say 'Article ID ', $article->id,
-            ' "',          $article->headline, '"',
-            ' by ',        $article->author->name;
+        print_article_short($article);
     }
+}
+
+sub full {
+    my $article = $schema->resultset('Article')->find(
+        1,
+        {
+            prefetch => [
+                'author', 'images', 
+                { article_keywords => 'keyword' }
+            ],
+        }
+    );
+    
+    print_article_long($article);
+}
+
+sub sub_in {
+    my $favourite_author_ids = $schema->resultset('Author')->search(
+        {
+            name => { -like => 'Viel%' },
+        }
+    )->get_column('author_id')->as_query;
+
+    my $popular_article_rs = $schema->resultset('Article')->search(
+        {
+            'me.author_id' => { -in => $favourite_author_ids },
+        },
+        {
+            prefetch => 'author',
+        }
+    );
+    
+    while (my $article = $popular_article_rs->next) {
+        print_article_short($article);
+    }
+}
+
+sub sub_exists {
+    my $image_for_article = $schema->resultset('Image')->search(
+        {
+            'i.article_id' => { -ident => 'a.article_id' },
+        },
+        {
+            alias => 'i',
+        }
+    )->as_query;
+
+    my $image_article_rs = $schema->resultset('Article')->search(
+        {
+            exists => $image_for_article,
+        },
+        {
+            alias => 'a',
+            prefetch => 'author',
+        }
+    );
+
+    while (my $article = $image_article_rs->next) {
+        print_article_short($article);
+    }
+}
+
+sub sub_column {
+    my $nr_images = $schema->resultset('Image')->search(
+        {
+            'i.article_id' => { -ident => 'a.article_id' },
+        },
+        {
+            alias => 'i',
+        }
+    )->count_rs->as_query;
+
+    my $article_rs = $schema->resultset('Article')->search(
+        {
+            # some condition
+        },
+        {
+            '+select' => [ $nr_images ],
+            '+as' => [ 'nr_images' ],
+            alias => 'a',
+        }
+    );
+
+    while (my $article = $article_rs->next) {
+        say 'Artikel "' . $article->headline . '" hat ' .
+            $article->get_column('nr_images') . ' Bild(er)';
+    }
+    
+}
+
+sub print_article_short {
+    my $article = shift;
+    
+    say 'Artikel: ',     $article->headline;
+    say 'Autor: ',       $article->author->name;
+}
+
+sub print_article_long {
+    my $article = shift;
+    
+    print_article_short($article);
+    say 'Bilder: ',      join(', ', map { $_->path } $article->images);
+    say 'Schlagworte: ', join(', ', map { $_->name } $article->keywords);
 }
